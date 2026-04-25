@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Redirecionando...</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 32px;
+            padding: 48px 32px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        
+        .spinner {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 24px;
+            border: 4px solid #e5e7eb;
+            border-top-color: #667eea;
+            border-right-color: #764ba2;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        h2 {
+            font-size: 22px;
+            color: #1f2937;
+            margin-bottom: 12px;
+        }
+        
+        p {
+            color: #6b7280;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e5e7eb;
+            border-radius: 2px;
+            margin: 24px 0 16px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 2px;
+            transition: width 0.1s linear;
+        }
+        
+        .manual-link {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 13px;
+        }
+        
+        .manual-link a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        .manual-link a:hover {
+            text-decoration: underline;
+        }
+        
+        .status {
+            font-size: 12px;
+            color: #9ca3af;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="spinner"></div>
+        <h2>Abrindo aplicativo...</h2>
+        <p>Você será redirecionado automaticamente</p>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        
+        <div class="manual-link">
+            <span>Não abriu automaticamente? </span>
+            <a href="#" id="manualAppLink">Abrir app manualmente</a>
+            <span> | </span>
+            <a href="#" id="manualStoreLink">Baixar da Play Store</a>
+        </div>
+        
+        <div class="status" id="statusMessage">
+            Tentando abrir o app...
+        </div>
+    </div>
+
+    <script>
+        // ⚙️ CONFIGURAÇÕES - ALTERE AQUI ⚙️
+        const CONFIG = {
+            // Scheme do seu app
+            DEEP_LINK_SCHEME: 'app-pastoral-social://',
+            
+            // Nome do pacote (para intent Android)
+            PACKAGE_NAME: 'com.aslap.apppastoralsocial', // <-- ALTERE PARA O SEU
+            
+            // URL da Play Store
+            PLAY_STORE_URL: 'https://play.google.com/store/apps/details?id=com.aslap.apppastoralsocial', // <-- ALTERE
+            
+            // Tempo para tentar abrir o app (ms)
+            APP_OPEN_TIMEOUT: 2000,
+            
+            // Tempo total antes de ir para Play Store (ms)
+            FALLBACK_TIMEOUT: 3000
+        };
+
+        // Extrai os parâmetros da URL
+        function getDeepLinkPath() {
+            // Pega tudo depois do domínio
+            // Ex: /doadorDetalheAcao/10
+            let path = window.location.pathname;
+            
+            // Remove a barra inicial se existir
+            if (path.startsWith('/')) {
+                path = path.substring(1);
+            }
+            
+            // Se tem path, adiciona ao scheme
+            if (path && path.length > 0) {
+                return CONFIG.DEEP_LINK_SCHEME + path;
+            }
+            
+            // Se não tem path, só o scheme
+            return CONFIG.DEEP_LINK_SCHEME;
+        }
+
+        // Atualiza a barra de progresso
+        let progressInterval = null;
+        let progress = 0;
+        
+        function startProgressBar() {
+            progressInterval = setInterval(() => {
+                progress += 5;
+                const fill = document.getElementById('progressFill');
+                if (fill) {
+                    fill.style.width = Math.min(progress, 100) + '%';
+                }
+                if (progress >= 100) {
+                    clearInterval(progressInterval);
+                }
+            }, 150);
+        }
+        
+        function updateStatus(message) {
+            const statusEl = document.getElementById('statusMessage');
+            if (statusEl) {
+                statusEl.textContent = message;
+            }
+        }
+
+        // MÉTODO 1: Intent URL (mais confiável para Android)
+        function tryOpenWithIntent(deepLink) {
+            const intentUrl = `intent://${deepLink.replace(CONFIG.DEEP_LINK_SCHEME, '')}#Intent;scheme=${CONFIG.DEEP_LINK_SCHEME.replace('://', '')};package=${CONFIG.PACKAGE_NAME};end`;
+            console.log('[Intent] Tentando com intent:', intentUrl);
+            window.location.href = intentUrl;
+            return true;
+        }
+
+        // MÉTODO 2: Iframe (silencioso)
+        function tryOpenWithIframe(deepLink) {
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = deepLink;
+            document.body.appendChild(iframe);
+            
+            setTimeout(() => {
+                if (document.body.contains(iframe)) {
+                    document.body.removeChild(iframe);
+                }
+            }, 500);
+            console.log('[Iframe] Tentando com iframe:', deepLink);
+        }
+
+        // MÉTODO 3: Window location (direto)
+        function tryOpenWithLocation(deepLink) {
+            console.log('[Location] Tentando com location:', deepLink);
+            window.location.href = deepLink;
+        }
+
+        // Controle de redirecionamento
+        let appOpened = false;
+        let fallbackTimer = null;
+        let appOpenTimer = null;
+
+        // Detecta se o app foi aberto (perda de foco da página)
+        function setupVisibilityDetection() {
+            let blurDetected = false;
+            
+            const handleBlur = () => {
+                if (!blurDetected) {
+                    console.log('[Detect] App abriu - página perdeu foco');
+                    blurDetected = true;
+                    appOpened = true;
+                    updateStatus('✓ Aplicativo aberto com sucesso!');
+                    
+                    // Limpar timers
+                    if (fallbackTimer) clearTimeout(fallbackTimer);
+                    if (appOpenTimer) clearTimeout(appOpenTimer);
+                    if (progressInterval) clearInterval(progressInterval);
+                }
+            };
+            
+            const handleVisibilityChange = () => {
+                if (document.hidden) {
+                    handleBlur();
+                }
+            };
+            
+            window.addEventListener('blur', handleBlur);
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+            
+            return () => {
+                window.removeEventListener('blur', handleBlur);
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
+            };
+        }
+
+        // Fallback: vai para a Play Store
+        function goToPlayStore() {
+            if (appOpened) return;
+            
+            console.log('[Fallback] App não detectado, redirecionando para Play Store');
+            updateStatus('Aplicativo não encontrado. Redirecionando para Play Store...');
+            
+            setTimeout(() => {
+                window.location.href = CONFIG.PLAY_STORE_URL;
+            }, 500);
+        }
+
+        // Atualiza links manuais
+        function updateManualLinks() {
+            const deepLink = getDeepLinkPath();
+            const manualAppLink = document.getElementById('manualAppLink');
+            const manualStoreLink = document.getElementById('manualStoreLink');
+            
+            if (manualAppLink) {
+                manualAppLink.href = deepLink;
+                manualAppLink.onclick = (e) => {
+                    e.preventDefault();
+                    window.location.href = deepLink;
+                    return false;
+                };
+            }
+            
+            if (manualStoreLink) {
+                manualStoreLink.href = CONFIG.PLAY_STORE_URL;
+                manualStoreLink.onclick = (e) => {
+                    e.preventDefault();
+                    window.location.href = CONFIG.PLAY_STORE_URL;
+                    return false;
+                };
+            }
+        }
+
+        // FUNÇÃO PRINCIPAL - Inicia o redirecionamento
+        async function startRedirection() {
+            const deepLink = getDeepLinkPath();
+            const isAndroid = /Android/i.test(navigator.userAgent);
+            const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+            
+            console.log('[Init] Dispositivo:', isAndroid ? 'Android' : (isIOS ? 'iOS' : 'Outro'));
+            console.log('[Init] Deep link:', deepLink);
+            console.log('[Init] Package:', CONFIG.PACKAGE_NAME);
+            
+            updateStatus(`Tentando abrir o app...`);
+            startProgressBar();
+            
+            // Para Android
+            if (isAndroid) {
+                setupVisibilityDetection();
+                
+                // Tenta abrir com múltiplos métodos em sequência
+                
+                // Método 1: Intent (melhor para Android)
+                tryOpenWithIntent(deepLink);
+                
+                // Método 2: Iframe (backup silencioso)
+                setTimeout(() => {
+                    if (!appOpened) {
+                        tryOpenWithIframe(deepLink);
+                    }
+                }, 100);
+                
+                // Método 3: Location (último recurso)
+                setTimeout(() => {
+                    if (!appOpened) {
+                        tryOpenWithLocation(deepLink);
+                    }
+                }, 400);
+                
+                // Timer para fallback (ir para Play Store)
+                fallbackTimer = setTimeout(() => {
+                    if (!appOpened) {
+                        goToPlayStore();
+                    }
+                }, CONFIG.FALLBACK_TIMEOUT);
+                
+            } 
+            // Para iOS (se for usar no futuro)
+            else if (isIOS) {
+                updateStatus('Redirecionando para o aplicativo...');
+                window.location.href = deepLink;
+                
+                fallbackTimer = setTimeout(() => {
+                    if (!appOpened) {
+                        window.location.href = CONFIG.PLAY_STORE_URL;
+                    }
+                }, CONFIG.FALLBACK_TIMEOUT);
+            }
+            // Outros SO (vai direto pra Play Store)
+            else {
+                updateStatus('Redirecionando para Play Store...');
+                setTimeout(() => {
+                    window.location.href = CONFIG.PLAY_STORE_URL;
+                }, 1000);
+            }
+        }
+
+        // Inicializa tudo quando a página carregar
+        window.addEventListener('load', () => {
+            updateManualLinks();
+            startRedirection();
+        });
+    </script>
+</body>
+</html>
