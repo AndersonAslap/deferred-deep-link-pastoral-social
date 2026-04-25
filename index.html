@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Redirecionando...</title>
+    <title>Redirecionando... v1</title>
     <style>
         * {
             margin: 0;
@@ -96,6 +96,14 @@
             color: #9ca3af;
             margin-top: 16px;
         }
+        
+        .debug {
+            font-size: 10px;
+            color: #9ca3af;
+            margin-top: 16px;
+            word-break: break-all;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -127,10 +135,10 @@
             DEEP_LINK_SCHEME: 'app-pastoral-social://',
             
             // Nome do pacote (para intent Android)
-            PACKAGE_NAME: 'com.aslap.apppastoralsocial', // <-- ALTERE PARA O SEU
+            PACKAGE_NAME: 'com.aslap.apppastoralsocial',
             
             // URL da Play Store
-            PLAY_STORE_URL: 'https://play.google.com/store/apps/details?id=com.aslap.apppastoralsocial', // <-- ALTERE
+            PLAY_STORE_URL: 'https://play.google.com/store/apps/details?id=com.aslap.apppastoralsocial',
             
             // Tempo para tentar abrir o app (ms)
             APP_OPEN_TIMEOUT: 2000,
@@ -139,23 +147,58 @@
             FALLBACK_TIMEOUT: 3000
         };
 
-        // Extrai os parâmetros da URL
+        // 🔥 NOVA FUNÇÃO: Extrai os parâmetros da QUERY STRING
+        // Ex: ?doadorDetalheAcao/10  →  retorna "doadorDetalheAcao/10"
+        function getDeepLinkFromQuery() {
+            // Pega a query string (tudo depois do ?)
+            const queryString = window.location.search;
+            
+            console.log('[Query] Query string completa:', queryString);
+            
+            if (!queryString || queryString.length <= 1) {
+                return null;
+            }
+            
+            // Remove o "?" inicial
+            let query = queryString.substring(1);
+            
+            // Se houver múltiplos parâmetros (com &), pega só o primeiro
+            if (query.includes('&')) {
+                query = query.split('&')[0];
+            }
+            
+            // Decodifica caracteres especiais (se houver)
+            query = decodeURIComponent(query);
+            
+            console.log('[Query] Parâmetro extraído:', query);
+            return query;
+        }
+
+        // 🔥 FUNÇÃO MODIFICADA: Constrói o deep link a partir da query string
         function getDeepLinkPath() {
-            // Pega tudo depois do domínio
-            // Ex: /doadorDetalheAcao/10
+            // PRIORIDADE 1: Query string (formato ?doadorDetalheAcao/10)
+            const queryParam = getDeepLinkFromQuery();
+            if (queryParam && queryParam.length > 0) {
+                console.log('[DeepLink] Usando query string:', queryParam);
+                return CONFIG.DEEP_LINK_SCHEME + queryParam;
+            }
+            
+            // PRIORIDADE 2: Path tradicional (para compatibilidade)
             let path = window.location.pathname;
             
-            // Remove a barra inicial se existir
+            // Remove a barra inicial
             if (path.startsWith('/')) {
                 path = path.substring(1);
             }
             
-            // Se tem path, adiciona ao scheme
-            if (path && path.length > 0) {
+            // Ignora se for vazio ou só "index.html"
+            if (path && path.length > 0 && path !== 'index.html') {
+                console.log('[DeepLink] Usando path:', path);
                 return CONFIG.DEEP_LINK_SCHEME + path;
             }
             
-            // Se não tem path, só o scheme
+            // Padrão: só o scheme
+            console.log('[DeepLink] Usando scheme padrão');
             return CONFIG.DEEP_LINK_SCHEME;
         }
 
@@ -293,8 +336,10 @@
             const isAndroid = /Android/i.test(navigator.userAgent);
             const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
             
+            console.log('[Init] URL completa:', window.location.href);
+            console.log('[Init] Query string:', window.location.search);
             console.log('[Init] Dispositivo:', isAndroid ? 'Android' : (isIOS ? 'iOS' : 'Outro'));
-            console.log('[Init] Deep link:', deepLink);
+            console.log('[Init] Deep link final:', deepLink);
             console.log('[Init] Package:', CONFIG.PACKAGE_NAME);
             
             updateStatus(`Tentando abrir o app...`);
